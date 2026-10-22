@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#681d3b">
+  <title>Entrega de kits · Voces que Corren</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/vendor/bootstrap.min.css">
+  <link rel="stylesheet" href="/vendor/sweetalert2.min.css">
+  <link rel="stylesheet" href="/styles.css">
+  <script defer src="/vendor/sweetalert2.all.min.js"></script>
+  <script defer src="/vendor/html5-qrcode.min.js"></script>
+  <script defer src="/app.js"></script>
+</head>
+<body>
+  <svg class="icon-defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24"><path d="m3 7 9-4 9 4v10l-9 4-9-4V7Z"/><path d="m3 7 9 4 9-4M12 11v10"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 2 8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4Z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-exit" viewBox="0 0 24 24"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5m5-4 4-4-4-4m-9 4h13"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 7h3l2-2h6l2 2h3v12H4V7Z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+  </svg>
+  <div class="shell container-xl">
+    <header class="site-header">
+      <div class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-box"/></svg></div>
+      <div class="brand-copy"><span class="brand-eyebrow">Voces que Corren</span><strong>Entrega de kits</strong></div>
+      <div id="headerActions" class="header-actions" hidden>
+        <span id="operatorChip" class="operator-chip"><svg class="icon"><use href="#i-shield"/></svg><span id="operatorName"></span></span>
+        <button id="logoutButton" class="logout-button" type="button" aria-label="Cerrar sesión" title="Cerrar sesión"><svg class="icon"><use href="#i-exit"/></svg><span>Salir</span></button>
+      </div>
+    </header>
+
+    <main id="loadingView" class="loading-view" aria-live="polite">Comprobando acceso…</main>
+
+    <main id="loginView" class="login-section" hidden>
+      <div class="row g-4 align-items-center">
+        <section class="col-lg-7 login-intro"><span class="eyebrow">Operación del evento</span><h1>Cada kit, a la persona correcta.</h1><p>Consulta únicamente inscripciones confirmadas con folio y marca la entrega una sola vez.</p></section>
+        <div class="col-lg-5"><section class="login-card" aria-labelledby="login-title">
+          <div class="section-icon"><svg class="icon"><use href="#i-shield"/></svg></div>
+          <h2 id="login-title">Acceso al control</h2>
+          <p>La cuenta puede compartirse. Escribe tu nombre para dejar constancia de quién entregó cada kit.</p>
+          <form id="loginForm" novalidate>
+            <label for="operator">Nombre de quien entrega</label>
+            <input id="operator" class="form-control" name="operator" type="text" autocomplete="name" maxlength="80" placeholder="Ej. Ana Pérez">
+            <label for="username">Usuario compartido</label>
+            <input id="username" class="form-control" name="username" type="text" autocomplete="username" placeholder="Usuario">
+            <label for="password">Contraseña</label>
+            <input id="password" class="form-control" name="password" type="password" autocomplete="current-password" placeholder="Contraseña">
+            <button id="loginButton" class="primary-button" type="submit">Entrar al sistema <svg class="icon"><use href="#i-arrow"/></svg></button>
+          </form>
+        </section></div>
+      </div>
+    </main>
+
+    <main id="dashboardView" class="main-content" hidden>
+      <section class="hero"><div><span class="eyebrow">Control de entrega</span><h1>Encuentra el folio.<br>Confirma la entrega.</h1><p>Busca por folio o nombre y verifica los datos antes de entregar el kit.</p></div><div class="hero-emblem" aria-hidden="true"><svg class="icon"><use href="#i-box"/></svg></div></section>
+      <section class="row g-2 g-md-3 stats" aria-label="Resumen de entregas">
+        <div class="col-12 col-md-4"><div class="stat stat-confirmed h-100"><div class="stat-copy"><span>Confirmados con folio</span><strong id="statConfirmed">—</strong><small id="statConfirmedContext">Del cupo total</small></div><div id="ringConfirmed" class="progress-ring" role="progressbar" aria-label="Cupo confirmado" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="statConfirmedPercent">—%</span></div></div></div>
+        <div class="col-12 col-md-4"><div class="stat stat-delivered h-100"><div class="stat-copy"><span>Kits entregados</span><strong id="statDelivered">—</strong><small>De los confirmados</small></div><div id="ringDelivered" class="progress-ring" role="progressbar" aria-label="Kits entregados de los confirmados" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="statDeliveredPercent">—%</span></div></div></div>
+        <div class="col-12 col-md-4"><div class="stat stat-pending h-100"><div class="stat-copy"><span>Pendientes de entrega</span><strong id="statPending">—</strong><small>De los confirmados</small></div><div id="ringPending" class="progress-ring" role="progressbar" aria-label="Kits pendientes de los confirmados" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="statPendingPercent">—%</span></div></div></div>
+      </section>
+      <section class="work-card" aria-labelledby="search-title">
+        <div class="work-heading"><div><span class="eyebrow">Paso 01</span><h2 id="search-title">Buscar participante</h2><p>Escribe el folio o nombre, o escanea el QR de su comprobante.</p></div><span class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle shadow-sm d-inline-flex align-items-center gap-2 px-3 py-2 fw-semibold status-badge live-mark"><span class="status-dot bg-success" aria-hidden="true"></span>Base actualizada</span></div>
+        <form id="searchForm" class="row g-2 search-form" novalidate>
+          <div class="col-12 col-md"><label class="visually-hidden" for="searchInput">Folio o nombre</label><div class="search-field"><svg class="icon"><use href="#i-search"/></svg><input id="searchInput" type="search" autocomplete="off" enterkeyhint="search" placeholder="Folio VC-2026-0001 o nombre"></div></div>
+          <div class="col-12 col-md-auto"><button id="searchButton" class="primary-button" type="submit">Buscar <svg class="icon"><use href="#i-arrow"/></svg></button></div>
+          <div class="col-12 col-md-auto"><button id="scanButton" class="scan-button" type="button" aria-controls="scannerPanel" aria-expanded="false"><svg class="icon"><use href="#i-camera"/></svg> Escanear QR</button></div>
+        </form>
+        <section id="scannerPanel" class="scanner-panel" aria-labelledby="scannerTitle" hidden>
+          <div class="scanner-heading"><div><strong id="scannerTitle">Leer QR del participante</strong><p>Apunta la cámara al código del comprobante. El kit no se marcará como entregado al escanear.</p></div><button id="closeScanner" class="scan-close" type="button">Cerrar cámara</button></div>
+          <div id="qrReader" class="qr-reader"></div>
+          <p id="scannerStatus" class="scanner-status" role="status">Abriendo cámara…</p>
+        </section>
+      </section>
+      <section class="results-section" aria-labelledby="results-title"><div class="results-heading"><span class="eyebrow">Paso 02</span><h2 id="results-title">Resultado de búsqueda</h2></div><div id="results" class="results" aria-live="polite"><div class="empty-state"><div class="empty-icon"><svg class="icon"><use href="#i-search"/></svg></div><strong>Listo para buscar</strong><p>Los datos del participante aparecerán aquí.</p></div></div></section>
+    </main>
+    <footer>Voces que Corren · Control interno de kits</footer>
+  </div>
+</body>
+</html>
