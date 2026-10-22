@@ -1,14 +1,54 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 
 process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/kit_test';
-process.env.KIT_ADMIN_USER = 'entrega';
-process.env.KIT_ADMIN_PASSWORD = 'una-clave-larga-de-prueba';
-process.env.SESSION_SECRET = 'un-secreto-de-prueba-de-mas-de-treinta-y-dos-caracteres';
+process.env.KIT_ADMIN_USER = `test_${crypto.randomBytes(8).toString('hex')}`;
+process.env.KIT_ADMIN_PASSWORD = crypto.randomBytes(24).toString('hex');
+process.env.SESSION_SECRET = crypto.randomBytes(32).toString('hex');
 
 const repository = require('../repository');
 const pool = require('../db');
 const app = require('../app');
+const { handler } = require('../netlify/functions/app');
+
+test('la función de Netlify recibe el nombre de quien entrega', async () => {
+  const body = JSON.stringify({
+    operator: 'Ana Pérez',
+    username: process.env.KIT_ADMIN_USER,
+    password: process.env.KIT_ADMIN_PASSWORD
+  });
+  const response = await handler({
+    httpMethod: 'POST', path: '/api/login',
+    headers: { 'content-type': 'application/json' },
+    body, isBase64Encoded: false
+  }, {});
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(JSON.parse(response.body), { ok: true });
+  const cookie = response.headers['set-cookie'].split(';')[0];
+  const sessionResponse = await handler({
+    httpMethod: 'GET', path: '/api/session', headers: { cookie }, body: ''
+  }, {});
+  const session = JSON.parse(sessionResponse.body);
+  assert.equal(session.authenticated, true);
+  assert.equal(session.operator, 'Ana Pérez');
+
+  const originalDeliver = repository.deliver;
+  repository.deliver = async (registroId, operator) => ({
+    status: 'delivered', registro_id: registroId, entregado_por: operator
+  });
+  try {
+    const deliveryResponse = await handler({
+      httpMethod: 'POST', path: '/api/entregas',
+      headers: { cookie, 'content-type': 'application/json', 'x-csrf-token': session.csrf },
+      body: JSON.stringify({ registroId: 55 }), isBase64Encoded: false
+    }, {});
+    assert.equal(deliveryResponse.statusCode, 201);
+    assert.equal(JSON.parse(deliveryResponse.body).entregado_por, 'Ana Pérez');
+  } finally {
+    repository.deliver = originalDeliver;
+  }
+});
 
 test('la búsqueda acepta nombres con o sin acento y el folio del QR', async () => {
   const originalQuery = pool.query;
@@ -51,13 +91,13 @@ test('autenticación, consulta y entrega única desde dos solicitudes', async ()
 
     const wrong = await fetch(`${url}/api/login`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ operator: 'Ana Pérez', username: 'entrega', password: 'incorrecta' })
+      body: JSON.stringify({ operator: 'Ana Pérez', username: process.env.KIT_ADMIN_USER, password: 'incorrecta' })
     });
     assert.equal(wrong.status, 401);
 
     const login = await fetch(`${url}/api/login`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ operator: 'Ana Pérez', username: 'entrega', password: process.env.KIT_ADMIN_PASSWORD })
+      body: JSON.stringify({ operator: 'Ana Pérez', username: process.env.KIT_ADMIN_USER, password: process.env.KIT_ADMIN_PASSWORD })
     });
     assert.equal(login.status, 200);
     const cookie = login.headers.get('set-cookie').split(';')[0];
