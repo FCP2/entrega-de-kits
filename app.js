@@ -6,6 +6,20 @@ const repository = require('./repository');
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
+// serverless-http entrega el cuerpo como Buffer; Express lo recibe ya marcado
+// y su parser JSON no vuelve a leerlo. Normalizarlo antes de las rutas.
+app.use((req, res, next) => {
+  if (!Buffer.isBuffer(req.body) || !req.is('application/json')) return next();
+  if (req.body.length > 16 * 1024) {
+    return res.status(413).json({ code: 'BODY_TOO_LARGE', message: 'La solicitud es demasiado grande.' });
+  }
+  try {
+    req.body = req.body.length ? JSON.parse(req.body.toString('utf8')) : {};
+    next();
+  } catch {
+    res.status(400).json({ code: 'INVALID_JSON', message: 'La solicitud no contiene JSON válido.' });
+  }
+});
 app.use(express.json({ limit: '16kb' }));
 app.use((req, res, next) => {
   res.set('Cache-Control', 'no-store');
