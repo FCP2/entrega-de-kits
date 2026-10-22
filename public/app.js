@@ -62,6 +62,9 @@
   const results = document.getElementById('results');
   const logoutButton = document.getElementById('logoutButton');
   const activeDeliveries = new Set();
+  const REFRESH_INTERVAL_MS = 30_000;
+  let refreshTimer = null;
+  let refreshInFlight = false;
   let csrf = '';
   let loggingIn = false;
   let searchTimer = null;
@@ -84,7 +87,10 @@
       loginView.hidden = authenticated;
       dashboardView.hidden = !authenticated;
       loadingView.hidden = true;
-      if (authenticated) await loadSummary();
+      if (authenticated) {
+        await loadSummary();
+        refreshTimer = window.setInterval(() => { void refreshVisibleData(); }, REFRESH_INTERVAL_MS);
+      }
     } catch (error) {
       loadingView.hidden = true;
       loginView.hidden = false;
@@ -199,7 +205,7 @@
     }).format(new Date(value));
   }
 
-  async function loadSummary() {
+  async function loadSummary({ quiet = false } = {}) {
     try {
       const summary = await request('/api/resumen');
       const confirmed = Number(summary.confirmados) || 0;
@@ -215,7 +221,7 @@
       updateRing('Delivered', delivered, confirmed);
       updateRing('Pending', pending, confirmed);
     } catch (error) {
-      if (error.code !== 'SESSION_EXPIRED') await alertBox('error', 'No se pudo cargar el resumen', error.message);
+      if (!quiet && error.code !== 'SESSION_EXPIRED') await alertBox('error', 'No se pudo cargar el resumen', error.message);
     }
   }
 
@@ -289,8 +295,9 @@
     }
   }
 
-  async function search({ quiet = false } = {}) {
+  async function search({ quiet = false, background = false } = {}) {
     clearTimeout(searchTimer);
+    searchTimer = null;
     const q = searchInput.value.trim();
     if (q.length < 2) {
       if (!quiet) await alertBox('warning', 'Falta el dato de búsqueda', 'Escribe al menos 2 caracteres del nombre o un folio.');
@@ -300,10 +307,10 @@
     searchController?.abort();
     const controller = new AbortController();
     searchController = controller;
-    searchButton.disabled = true;
+    if (!background) searchButton.disabled = true;
     try {
       const { results: people } = await request(`/api/buscar?q=${encodeURIComponent(q)}`, { signal: controller.signal });
-      if (revision !== searchRevision) return;
+      if (revision !== searchRevision || (background && (activeDeliveries.size || Swal.isVisible()))) return;
       if (!people.length) {
         emptyState('Sin coincidencias', 'Revisa el folio o el nombre. Solo aparecen registros confirmados con folio.');
         if (!quiet) await alertBox('warning', 'No encontramos el registro', 'Comprueba el folio o el nombre. La inscripción debe estar confirmada.');
@@ -313,14 +320,30 @@
     } catch (error) {
       if (error.name === 'AbortError' || revision !== searchRevision) return;
       if (error.code !== 'SESSION_EXPIRED') {
-        if (quiet) emptyState('No se pudo buscar', 'Comprueba tu conexión e intenta de nuevo.');
-        else await alertBox('error', 'No se pudo buscar', error.message);
+        if (quiet) {
+          if (!background) emptyState('No se pudo buscar', 'Comprueba tu conexión e intenta de nuevo.');
+        } else await alertBox('error', 'No se pudo buscar', error.message);
       }
     } finally {
       if (revision === searchRevision) {
         searchController = null;
-        searchButton.disabled = false;
+        if (!background) searchButton.disabled = false;
       }
+    }
+  }
+
+  async function refreshVisibleData() {
+    if (document.hidden || dashboardView.hidden || loggingOut || refreshInFlight ||
+        activeDeliveries.size || searchController || searchTimer || Swal.isVisible()) return;
+    refreshInFlight = true;
+    try {
+      await loadSummary({ quiet: true });
+      if (searchInput.value.trim().length >= 2 && !searchController && !searchTimer &&
+          !activeDeliveries.size && !Swal.isVisible()) {
+        await search({ quiet: true, background: true });
+      }
+    } finally {
+      refreshInFlight = false;
     }
   }
 
@@ -358,6 +381,7 @@
   searchForm.addEventListener('submit', event => { event.preventDefault(); void search(); });
   searchInput.addEventListener('input', () => {
     clearTimeout(searchTimer);
+    searchTimer = null;
     searchRevision++;
     searchController?.abort();
     searchController = null;
@@ -376,8 +400,12 @@
   closeScannerButton.addEventListener('click', () => { void closeScanner(); });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && scanner) void closeScanner();
+    if (!document.hidden) void refreshVisibleData();
   });
-  window.addEventListener('pagehide', () => { if (scanner) void closeScanner(); });
+  window.addEventListener('pagehide', () => {
+    if (refreshTimer) window.clearInterval(refreshTimer);
+    if (scanner) void closeScanner();
+  });
   logoutButton.addEventListener('click', async () => {
     if (loggingOut) return;
     loggingOut = true;
