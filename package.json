@@ -1,0 +1,25 @@
+{
+  "name": "voces-que-corren-entrega-kits",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Control independiente de entrega de kits",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "dev": "npm run build && node --watch server.js",
+    "start": "node server.js",
+    "db:migrate": "node scripts/migrate.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "bootstrap": "^5.3.8",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "html5-qrcode": "^2.3.8",
+    "pg": "^8.13.3",
+    "serverless-http": "^3.2.0",
+    "sweetalert2": "^11.26.17"
+  }
+}
